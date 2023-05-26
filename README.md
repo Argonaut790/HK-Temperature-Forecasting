@@ -1,13 +1,13 @@
 ## Global-Solar-Radiation-in-King-s-Park
 Utilizing Machine Learning Regression Model to predict tge global solar radiation using the data that collected in King's Park
 
-## First Aproach - Trying to predict the average temperature
-- Using MYSQL and query to handle data
+## First Approach - Trying to predict the average temperature
+- Using MySQL and query to handle data
 - Using variables including bright sun time, relative humidity and global solar radiation
 - Analysing Linear Regression and various degrees of Polynomial Regression's accuracy
 - Result: Data Correlation are bad, also may be due to city's heat island effect, it's not that easy to predict with such a little dataset that could be found on the gov db, r2 = 0.47
 
-## Second Aproach - Turn the predicting variable to the GSR
+## Second Approach - Turn the predicting variable to the GSR
 - Turned to use pandas to handle data
 - Added 3 more variables including rainfall, uv and mean wind speed
 - Preprocessed the data with feature selection and normalization
