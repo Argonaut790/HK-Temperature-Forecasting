@@ -7,6 +7,10 @@ Utilizing Machine Learning Regression Model to predict tge global solar radiatio
 - Analysing Linear Regression and various degrees of Polynomial Regression's accuracy
 - Result: Data Correlation are bad, also may be due to city's heat island effect, it's not that easy to predict with such a little dataset that could be found on the gov db, r2 = 0.47
 
+<p align="center">  
+  <img src="./result/avgTemp_ml.png" width="100%">
+</p> 
+
 ## Second Approach - Turn the predicting variable to the GSR
 - Turned to use pandas to handle data
 - Added 3 more variables including rainfall, uv and mean wind speed
