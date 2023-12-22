@@ -10,7 +10,7 @@ Utilizing Machine Learning Regression Model to predict tge global solar radiatio
 - Result: Data Correlation are bad, also may be due to city's heat island effect, it's not that easy to predict with such a little dataset that could be found on the gov db, r2 = 0.47
 
 <p align="center">  
-  <img src="./result/avgTemp_ml.png" width="100%">
+  <img src="./result/regression/avgTemp_ml.png" width="100%">
 </p>
 
 ## Second Approach - Turn the predicting variable to the GSR
@@ -26,9 +26,9 @@ Utilizing Machine Learning Regression Model to predict tge global solar radiatio
 - After the data preprocessing, using degree=6 to optimize the model
 
 <p align="center">  
-  <img src="./result/r2score_deg_GSR.png" width="100%">
-  <img src="./result/r2score_deg_GSR+ALL.png" width="100%">
-  <img src="./result/r2score_deg_GSR+UV.png" width="100%">
+  <img src="./result/regression/r2score_deg_GSR.png" width="100%">
+  <img src="./result/regression/r2score_deg_GSR+ALL.png" width="100%">
+  <img src="./result/regression/r2score_deg_GSR+UV.png" width="100%">
 </p>
 
 ### Prediction Result on GSD with AVG_TEMP, SUN and UV
@@ -36,7 +36,7 @@ Utilizing Machine Learning Regression Model to predict tge global solar radiatio
 - r2 = 0.9044
 
 <p align="center">  
-  <img src="./result/GSR VS AVG_TEMP,SUN,UV_deg6.png" width="100%">
+  <img src="./result/regression/GSR VS AVG_TEMP,SUN,UV_deg6.png" width="100%">
 </p>
 
 <a name='run_locally'></a>
