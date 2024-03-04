@@ -8,7 +8,7 @@ VERSION = '1.0.0'
 LICENSE = 'MIT'
 KEYWORDS = ['']
 REQUIREMENTS = ['loguru', 'numpy', 'matplotlib', 'scipy', 'mysql-connector',
-                'scikit-learn', 'polars', 'xgboost', 'IPython', 'seaborn',
+                'scikit-learn', 'polars', 'xgboost', 'ipython', 'ipykernel', 'seaborn',
                 'lightgbm']
 
 setup(name=NAME, version=VERSION, packages=find_packages(), 
