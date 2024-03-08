@@ -9,7 +9,7 @@ LICENSE = 'MIT'
 KEYWORDS = ['']
 REQUIREMENTS = ['loguru', 'numpy', 'matplotlib', 'scipy', 'mysql-connector',
                 'scikit-learn', 'polars', 'xgboost', 'ipython', 'ipykernel', 'seaborn',
-                'lightgbm']
+                'lightgbm', 'tensorflow', 'keras', 'skforecast']
 
 setup(name=NAME, version=VERSION, packages=find_packages(), 
       install_requires=REQUIREMENTS, author=AUTHOR, author_email=EMAIL,
