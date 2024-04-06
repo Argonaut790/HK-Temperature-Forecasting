@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-NAME = 'argonaut-temp-forecast'
+NAME = 'HK-Temperature-Forecasting'
 DESCRIPTION = ''
 AUTHOR = 'Billy Tse'
 EMAIL = 'tung23966373@gmail.com'
