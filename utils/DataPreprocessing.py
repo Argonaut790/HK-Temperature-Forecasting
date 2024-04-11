@@ -11,8 +11,9 @@ color_pal = sns.color_palette()
 plt.style.use('fivethirtyeight')
 
 class dataloader():
-    def __init__(self, path:str=os.getcwd()):
+    def __init__(self, path:str=os.getcwd(), lag=20):
         self.parent_dir = path
+        self.lag = lag
         self.data_dir = os.path.join(self.parent_dir, "data")
         self.AVG_TEMP_DATA = os.path.join(self.data_dir, "CLMTEMP_KP_.csv")
         self.GSR_DATA = os.path.join(self.data_dir, "daily_KP_GSR_ALL.csv")
@@ -34,14 +35,19 @@ class dataloader():
         self.start_date, self.end_date = self.get_overlapped_range(self.AVG_TEMP_df, self.GSR_df, self.RH_df, self.SUN_df, self.RF_df, self.UV_df, self.WSPD_df, data_column='date')
 
         self.joined_df = self.join_df(self.start_date, self.end_date, self.AVG_TEMP_df, self.GSR_df, self.RH_df, self.SUN_df, self.RF_df, self.UV_df, self.WSPD_df)
-        
+
         self.features = self.feature_engineering()
+        # self.train, self.test = self.split_data(self.features)
+        # self.train, self.val = self.split_data(self.train)
+        # self.X_train, self.y_train, self.date_train = self.split_xy(self.train)
+        # self.X_val, self.y_val, self.date_val = self.split_xy(self.val)
+        # self.X_test, self.y_test, self.date_test = self.split_xy(self.test)
         self.train, self.test = self.split_data(self.features)
-        self.train, self.val = self.split_data(self.train)
-        self.X_train, self.y_train, self.date_train = self.split_xy(self.train)
-        self.X_val, self.y_val, self.date_val = self.split_xy(self.val)
-        self.X_test, self.y_test, self.date_test = self.split_xy(self.test)
-    
+        # self.X_train, self.y_train, self.date_train = self.split_xy(self.train)
+        # self.X_test, self.y_test, self.date_test = self.split_xy(self.test)
+        self.X_train, self.y_train = self.split_series(self.train, n_past=self.lag, n_future=1)
+        self.X_test, self.y_test = self.split_series(self.test, n_past=self.lag, n_future=1)
+
     def get_overlapped_range(self, *args:list[DataFrame], data_column):
         start_date = None
         end_date = None
@@ -62,7 +68,7 @@ class dataloader():
                         end_date = df_end_date
 
         return start_date, end_date
-    
+
     def join_df(self, start_date:pl.Date, end_date:pl.Date, *args:list[DataFrame]):
         dfs = []
 
@@ -79,18 +85,18 @@ class dataloader():
         # drop columns that end with _DC
         columns_to_keep = [col for col in joined_df.columns if not col.endswith("_DC")]
         joined_df = joined_df.select(columns_to_keep)
-        
+
         # # interpolate the missing data
         # joined_df = joined_df.interpolate()
         return joined_df
-    
+
     def fill_na_with_LI(self, df:DataFrame, order:int=3):
         """
         fill the null value with Spline Interpolation
         """
         # Change the interpolation method to 'spline'
         return df.interpolate()
-    
+
     def load_csv(self, file_path: str, value_name: str) -> DataFrame:
         df = pl.read_csv(file_path, has_header=False, skip_rows=2)
         """
@@ -125,7 +131,7 @@ class dataloader():
         logger.info(df.null_count())
         # pl.from_pandas(df.to_pandas().set_index("date"))
         return df
-    
+
     def plot_df(self, df: pl.DataFrame, title: str):
         """
         Plots the first column of the DataFrame against the 'date' column using a scatter plot.
@@ -143,18 +149,18 @@ class dataloader():
         # logger.info(df.head(5))
         min_value = df[data_col].min()
         max_value = df[data_col].max()
-        
+
         logger.info(f"Min value: {min_value}, Max value: {max_value}")
         ticks = np.arange(int(min_value)-2, int(max_value)+2, step=2)
         logger.info(ticks)
         # Create the scatter plot
         sns.scatterplot(x=date_col, y=data_col, data=plot_data)
         plt.yticks(ticks=ticks)
-        
+
         plt.title(title)
         plt.show()
         return
-    
+
     def remove_outliers(self, df:DataFrame, column:str, threshold:float=5):
         """
         Remove the outliers in the column of the DataFrame
@@ -167,7 +173,7 @@ class dataloader():
         mask = (df[column] < mean + threshold * std) & (df[column] > mean - threshold * std)
         df = df.filter(mask)
         return df
-    
+
     def weather_feature(self, df:DataFrame):
         """
         Add weather features to the DataFrame
@@ -175,7 +181,7 @@ class dataloader():
         """
         df = df.with_columns(pl.col("SUN").map_elements(lambda x: 0 if x == 0 else 1, return_dtype=pl.Int32).alias("weather"))        
         return df
-    
+
     def seasonal_decompose(self, df:DataFrame, model:str='additive', period:int=365):
         """
         Seasonal decomposition using moving averages
@@ -188,7 +194,7 @@ class dataloader():
         df = df.with_columns(pl.col("date").dt.ordinal_day().alias("dayofyear"))
         df = df.with_columns(pl.col("date").dt.quarter().alias("quarter"))
         return df
-    
+
     def plot_avg_temp(self, df:DataFrame, column:str="AVG_TEMP"):
         """
         Plot the average temperature
@@ -206,7 +212,7 @@ class dataloader():
 
         plt.show()
         return
-    
+
     # transform a time series dataset into a supervised learning dataset
     def series_to_supervised(self, df:DataFrame, time_series_key:str, n_in=0, n_out=0):
         # input sequence (t-n, ... t-1)
@@ -217,9 +223,40 @@ class dataloader():
             df = df.with_columns(pl.col(time_series_key).shift(-i).alias(time_series_key+'_t+'+str(i)))
 
         return df[n_in:]
-    
+
+    def split_series(self, df:DataFrame, n_past=0, n_future=1):
+        #
+        # n_past ==> no of past observations
+        #
+        # n_future ==> no of future observations
+        #
+        X, y = list(), list()
+        for window_start in range(len(df)):
+            past_end = window_start + n_past
+            future_end = past_end + n_future
+            if future_end > len(df):
+                break
+            # slicing the past and future parts of the window
+            past, future = df.slice(window_start, n_past).drop(["date"]), df.slice(
+                past_end, n_future
+            ).drop(
+                [
+                    "date",
+                    "dayofweek",
+                    "Month",
+                    "year",
+                    "dayofmonth",
+                    "weekofyear",
+                    "dayofyear",
+                    "quarter",
+                ]
+            )
+            X.append(past)
+            y.append(future)
+        return X, y
+
     def feature_engineering(self):
-        
+
         # remove the outliers
         logger.info("RF")
         rf_threshold = 6
@@ -231,24 +268,36 @@ class dataloader():
         wspd_removed_count = len(self.WSPD_df) - len(wspd_df[0])
         logger.success(f"Removed {rf_removed_count} outliers from RF")
         logger.success(f"Removed {wspd_removed_count} outliers from WSPD")
-        
+
         joined_df = self.join_df(self.start_date, self.end_date, self.AVG_TEMP_df, self.GSR_df, self.SUN_df, self.RH_df, self.UV_df, rf_df[0], wspd_df[0])
-        
+
         # perform linear interpolation
         joined_df = self.fill_na_with_LI(joined_df)
-        
+
         # add weather feature
         joined_df = self.weather_feature(joined_df)
-        
+
         # seasonal decomposition
         joined_df = self.seasonal_decompose(joined_df)
-        
+
         logger.info(joined_df)
         logger.info(joined_df.null_count())
         # shift the average temperature to the next day
-        joined_df = self.series_to_supervised(df=joined_df, time_series_key="AVG_TEMP", n_in=20, n_out=0) # past 20 days
+        # joined_df = self.series_to_supervised(df=joined_df, time_series_key="AVG_TEMP", n_in=self.lag, n_out=0) # past 20 days
+
+        # logger.info(joined_df.null_count())
+
+        # Turn all columns with same data type to float
+        for col in joined_df.columns:
+            if col == "date":
+                continue
+            if not joined_df[col].dtype == pl.Float32:
+                joined_df = joined_df.with_columns(pl.col(col).cast(pl.Float32, strict=False).alias(col))
         logger.info(joined_df)
-        logger.info(joined_df.null_count())
+
+        # joined_df = self.split_series(joined_df, n_past=self.lag, n_future=1)
+        # logger.info(joined_df.shape)
+
         return joined_df
 
     def split_data(self, df:DataFrame):
@@ -261,7 +310,7 @@ class dataloader():
         y_df = df["AVG_TEMP"]
         date = df["date"]
         return x_df, y_df, date
-    
+
 if __name__ == "__main__":
     data = dataloader()
     # data.plot_df(data.AVG_TEMP_df[:730], "AVG_TEMP")

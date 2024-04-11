@@ -1,6 +1,8 @@
 import torch
+import numpy as np
+from loguru import logger
 
-#implementation of utils
+# implementation of utils
 class RevIN(torch.nn.Module):
     def __init__(self, num_features: int, eps=1e-5, affine=True, subtract_last=False, target_idx=-1):
         super(RevIN, self).__init__()
@@ -102,7 +104,7 @@ class Flatten_Head_For_Single_Output(torch.nn.Module):
         x = self.dropout(x)
         return x
 
-#Implementation of PatchTST Encorder layer
+# Implementation of PatchTST Encorder layer
 class TSTiEncoder(torch.nn.Module):  #i means channel-independent
     def __init__(self, c_in, patch_num, patch_len, max_seq_len=1024,
                  n_layers=3, d_model=128, n_heads=16, d_k=None, d_v=None,
@@ -140,8 +142,8 @@ class TSTiEncoder(torch.nn.Module):  #i means channel-independent
         z = z.permute(0,1,3,2)                                                   # z: [bs x nvars x d_model x patch_num]
         
         return z       
-            
-    
+
+
 # Cell
 class TSTEncoder(torch.nn.Module):
     def __init__(self, q_len, d_model, n_heads, d_k=None, d_v=None, d_ff=None, 
@@ -166,7 +168,6 @@ class TSTEncoder(torch.nn.Module):
             for mod in self.layers: 
                 output = mod(output, key_padding_mask=key_padding_mask, attn_mask=attn_mask)
             return output
-
 
 
 class TSTEncoderLayer(torch.nn.Module):
@@ -236,7 +237,7 @@ class TSTEncoderLayer(torch.nn.Module):
             return src, scores
         else:
             return src
-        
+
 
 class _MultiheadAttention(torch.nn.Module):
     def __init__(self, d_model, n_heads, d_k=None, d_v=None, res_attention=False, attn_dropout=0., proj_dropout=0., qkv_bias=True, lsa=False):
@@ -321,7 +322,7 @@ class _ScaledDotProductAttention(torch.nn.Module):
         if self.res_attention: return output, attn_weights, attn_scores
         else: return output, attn_weights
 
-#Implementation of PatchTST
+# Implementation of PatchTST
 class PatchTST(torch.nn.Module):
 
     def __init__(self, c_in, context_window, target_window, patch_len, stride, max_seq_len=1024, 
@@ -351,32 +352,30 @@ class PatchTST(torch.nn.Module):
                                 attn_dropout=attn_dropout, dropout=dropout, key_padding_mask=key_padding_mask, padding_var=padding_var,
                                 attn_mask=attn_mask, res_attention=res_attention, pre_norm=pre_norm, store_attn=store_attn,
                                 verbose=verbose, **kwargs)
-        
+
         self.head_nf = d_model * patch_num
         self.n_vars = c_in
 
         self.head = Flatten_Head_For_Single_Output(self.n_vars, self.head_nf, target_window, head_dropout=head_dropout)
-        
-        
+
     def forward(self, z):                                                                   # z: [bs x seq_len × nvars]
         # instance norm
         if self.revin:                                                          
             z = self.revin_layer(z, "norm")
             z = z.permute(0,2,1)                                                            # z: [bs x nvars × seq_len]
-            
+        # logger.debug(f"Input shape: {z.shape}")
         # patching
         if self.padding_patch == "end":
             z = self.padding_patch_layer(z)
         z = z.unfold(dimension=-1, size=self.patch_len, step=self.stride)                   # z: [bs x nvars x patch_num x patch_len]
         z = z.permute(0,1,3,2)                                                              # z: [bs x nvars x patch_len x patch_num]
-        
+        # logger.debug(f"Input shape: {z.shape}")
         # model
         z = self.backbone(z)                                                                # z: [bs x nvars x d_model x patch_num]
+        # logger.debug(f"Input shape: {z.shape}")
         z = self.head(z)                                                                    # z: [bs x target_window] 
-        
+
         # denorm
         if self.revin:                                                         
             z = self.revin_layer(z, "denorm")
         return z
-    
-    
