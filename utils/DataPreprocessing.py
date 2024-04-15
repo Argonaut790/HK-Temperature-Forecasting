@@ -43,10 +43,10 @@ class dataloader():
         # self.X_val, self.y_val, self.date_val = self.split_xy(self.val)
         # self.X_test, self.y_test, self.date_test = self.split_xy(self.test)
         self.train, self.test = self.split_data(self.features)
-        # self.X_train, self.y_train, self.date_train = self.split_xy(self.train)
-        # self.X_test, self.y_test, self.date_test = self.split_xy(self.test)
-        self.X_train, self.y_train = self.split_series(self.train, n_past=self.lag, n_future=1)
-        self.X_test, self.y_test = self.split_series(self.test, n_past=self.lag, n_future=1)
+        self.X_train, self.y_train, self.date_train = self.split_xy(self.train)
+        self.X_test, self.y_test, self.date_test = self.split_xy(self.test)
+        # self.X_train, self.y_train = self.split_series(self.train, n_past=self.lag, n_future=1)
+        # self.X_test, self.y_test = self.split_series(self.test, n_past=self.lag, n_future=1)
 
     def get_overlapped_range(self, *args:list[DataFrame], data_column):
         start_date = None
@@ -237,7 +237,8 @@ class dataloader():
             if future_end > len(df):
                 break
             # slicing the past and future parts of the window
-            past, future = df.slice(window_start, n_past).drop(["date"]), df.slice(
+            past = df.slice(window_start, n_past).drop(["date"])
+            future = df.slice(
                 past_end, n_future
             ).drop(
                 [
@@ -250,7 +251,7 @@ class dataloader():
                     "dayofyear",
                     "quarter",
                 ]
-            )
+            )["AVG_TEMP"]
             X.append(past)
             y.append(future)
         return X, y
@@ -270,7 +271,18 @@ class dataloader():
         logger.success(f"Removed {wspd_removed_count} outliers from WSPD")
 
         joined_df = self.join_df(self.start_date, self.end_date, self.AVG_TEMP_df, self.GSR_df, self.SUN_df, self.RH_df, self.UV_df, rf_df[0], wspd_df[0])
+        joined_df = pl.DataFrame(joined_df)
 
+        # transform timestamp to datetime
+        from datetime import datetime
+        time_df = pl.datetime_range(
+            datetime(self.start_date.year, self.start_date.month, self.start_date.day), 
+            datetime(self.end_date.year, self.end_date.month, self.end_date.day),
+            "1d", eager=True
+        ).alias("datetime")
+        
+        joined_df = joined_df.with_columns([time_df.alias("date")])
+        logger.error(joined_df)
         # perform linear interpolation
         joined_df = self.fill_na_with_LI(joined_df)
 
