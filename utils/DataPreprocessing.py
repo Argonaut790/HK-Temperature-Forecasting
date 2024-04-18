@@ -11,7 +11,10 @@ color_pal = sns.color_palette()
 plt.style.use('fivethirtyeight')
 
 class dataloader():
-    def __init__(self, path:str=os.getcwd(), lag=20):
+
+    def __init__(
+        self, path: str = os.getcwd(), supervised=False, lag=20, n_steps_out=1
+    ):
         self.parent_dir = path
         self.lag = lag
         self.data_dir = os.path.join(self.parent_dir, "data")
@@ -36,15 +39,15 @@ class dataloader():
 
         self.joined_df = self.join_df(self.start_date, self.end_date, self.AVG_TEMP_df, self.GSR_df, self.RH_df, self.SUN_df, self.RF_df, self.UV_df, self.WSPD_df)
 
-        self.features = self.feature_engineering()
+        self.features = self.feature_engineering(supervised, lag, n_steps_out)
         # self.train, self.test = self.split_data(self.features)
         # self.train, self.val = self.split_data(self.train)
         # self.X_train, self.y_train, self.date_train = self.split_xy(self.train)
         # self.X_val, self.y_val, self.date_val = self.split_xy(self.val)
         # self.X_test, self.y_test, self.date_test = self.split_xy(self.test)
         self.train, self.test = self.split_data(self.features)
-        self.X_train, self.y_train, self.date_train = self.split_xy(self.train)
-        self.X_test, self.y_test, self.date_test = self.split_xy(self.test)
+        self.X_train, self.y_train, self.date_train = self.split_xy(self.train, supervised=supervised, n_future=n_steps_out)
+        self.X_test, self.y_test, self.date_test = self.split_xy(self.test, supervised=supervised, n_future=n_steps_out)
         # self.X_train, self.y_train = self.split_series(self.train, n_past=self.lag, n_future=1)
         # self.X_test, self.y_test = self.split_series(self.test, n_past=self.lag, n_future=1)
 
@@ -219,10 +222,10 @@ class dataloader():
         for i in range(n_in, 0, -1):
             df = df.with_columns(pl.col(time_series_key).shift(i).alias(time_series_key+'_t-'+str(i)))
         # forecast sequence (t, t+1, ... t+n)
-        for i in range(1, n_out+1):
+        for i in range(1, n_out):
             df = df.with_columns(pl.col(time_series_key).shift(-i).alias(time_series_key+'_t+'+str(i)))
 
-        return df[n_in:]
+        return df[n_in:-n_out]
 
     def split_series(self, df:DataFrame, n_past=0, n_future=1):
         #
@@ -256,7 +259,7 @@ class dataloader():
             y.append(future)
         return X, y
 
-    def feature_engineering(self):
+    def feature_engineering(self, supervised:bool=False, n_past:int=20, n_future:int=1):
 
         # remove the outliers
         logger.info("RF")
@@ -280,7 +283,7 @@ class dataloader():
             datetime(self.end_date.year, self.end_date.month, self.end_date.day),
             "1d", eager=True
         ).alias("datetime")
-        
+
         joined_df = joined_df.with_columns([time_df.alias("date")])
         logger.error(joined_df)
         # perform linear interpolation
@@ -294,8 +297,10 @@ class dataloader():
 
         logger.info(joined_df)
         logger.info(joined_df.null_count())
-        # shift the average temperature to the next day
-        # joined_df = self.series_to_supervised(df=joined_df, time_series_key="AVG_TEMP", n_in=self.lag, n_out=0) # past 20 days
+
+        if supervised:
+            # shift the average temperature to the next day
+            joined_df = self.series_to_supervised(df=joined_df, time_series_key="AVG_TEMP", n_in=n_past, n_out=n_future) # past 20 days
 
         # logger.info(joined_df.null_count())
 
@@ -317,10 +322,16 @@ class dataloader():
         train_df, test_df = train_test_split(df, test_size=0.2, shuffle=False)
         return train_df, test_df
 
-    def split_xy(self, df:DataFrame):
-        x_df = df.drop(["AVG_TEMP", "date"])
-        y_df = df["AVG_TEMP"]
+    def split_xy(self, df:DataFrame, supervised:bool=False, n_future:int=1):
+        drop_list = ["AVG_TEMP", "date"]
+        target_list = ["AVG_TEMP"]
         date = df["date"]
+        if supervised:
+            for i in range(1, n_future):
+                drop_list.append(f"AVG_TEMP_t+{i}")
+                target_list.append(f"AVG_TEMP_t+{i}")
+        x_df = df.drop(drop_list)
+        y_df = df.select(pl.col(target_list))
         return x_df, y_df, date
 
 if __name__ == "__main__":
